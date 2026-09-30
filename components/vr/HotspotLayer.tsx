@@ -232,6 +232,15 @@ function HotspotEntity({ hotspot, onActivate }: { hotspot: Hotspot; onActivate: 
         />
 
         <a-text value={hotspot.label} align="center" position="0 0.74 0" width="5" color="#ffffff" />
+
+        {/* Hit-target TAK TERLIHAT untuk raycaster VR (gaze & laser controller).
+            Raycaster A-Frame hanya mengetes mesh yang menempel LANGSUNG pada
+            entity yang cocok selektornya — root .clickable tak punya mesh, jadi
+            tanpa ini hotspot tak bisa dipilih sama sekali di VR. Tegak menghadap
+            kamera (bukan rebah spt panah navigasi) supaya mudah dibidik;
+            material visible:false tidak dirender tapi tetap kena raycast. */}
+        <a-circle class="hs-hit" radius="0.6" material="visible: false; side: double" />
+
       </a-entity>
     </a-entity>
   );

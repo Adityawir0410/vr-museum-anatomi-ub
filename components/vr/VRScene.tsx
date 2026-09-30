@@ -281,13 +281,14 @@ export default function VRScene({ initialSceneId }: { initialSceneId: string }) 
           look-controls="mouseEnabled: false; touchEnabled: false"
           wasd-controls="enabled: false"
         >
-          {/* Dot/reticle gaze — HANYA untuk mode VR (Cardboard); di desktop
-              disembunyikan & raycaster-nya mati (klik pakai mouse langsung). */}
+          {/* Dot/reticle gaze — HANYA untuk mode VR; di desktop disembunyikan &
+              raycaster-nya mati (klik pakai mouse langsung). Target raycast =
+              hit-target .hs-hit tiap hotspot (lihat HotspotLayer). */}
           <a-entity
             ref={cursorRef}
             visible="false"
             cursor="fuse: true; fuseTimeout: 1000"
-            raycaster="objects: .clickable; enabled: false"
+            raycaster="objects: .hs-hit; enabled: false"
             position="0 0 -1"
             geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.025"
             material="color: #ffffff; shader: flat; opacity: 0.9"
