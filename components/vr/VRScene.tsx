@@ -67,6 +67,8 @@ export default function VRScene({ initialSceneId }: { initialSceneId: string }) 
   const skyRef = useRef<HTMLElement>(null);
   const cameraRef = useRef<HTMLElement>(null);
   const cursorRef = useRef<HTMLElement>(null);
+  const leftHandRef = useRef<HTMLElement>(null);
+  const rightHandRef = useRef<HTMLElement>(null);
   const transitioningRef = useRef(false);
   const didIntroRef = useRef(false);
   const currentIdRef = useRef<string | null>(null);
@@ -115,26 +117,54 @@ export default function VRScene({ initialSceneId }: { initialSceneId: string }) 
   // Cursor per mode (tanpa dot di desktop):
   // - Desktop: TANPA dot — klik & hover hotspot ditangani raycast manual di
   //   komponen smooth-drag-look (lepas tanpa geser = klik di posisi pointer).
-  // - VR (Cardboard): dot gaze dimunculkan + raycaster + fuse aktif
-  //   (satu-satunya cara "klik" pakai pandangan).
+  // - VR dengan controller (Meta Quest dll): laser-controls — tunjuk hotspot
+  //   pakai sinar laser, tekan trigger untuk klik. Dot gaze DIMATIKAN selama
+  //   ada controller terhubung supaya tatapan tak ikut memicu klik (fuse).
+  // - VR tanpa controller (Cardboard / headset tanpa controller): dot gaze +
+  //   fuse (tatap 1 detik = klik).
   useEffect(() => {
     if (!ready) return;
-    const sceneEl = document.querySelector('a-scene');
-    const gaze = cursorRef.current as unknown as { setAttribute(c: string, p?: unknown, v?: unknown): void } | null;
+    const sceneEl = document.querySelector('a-scene') as
+      | (HTMLElement & { is(state: string): boolean })
+      | null;
+    type AEl = { setAttribute(c: string, p?: unknown, v?: unknown): void };
+    const gaze = cursorRef.current as unknown as AEl | null;
+    const hands = [leftHandRef.current, rightHandRef.current].filter(Boolean) as HTMLElement[];
     if (!sceneEl || !gaze) return;
-    const enter = () => {
-      gaze.setAttribute('visible', true);
-      gaze.setAttribute('raycaster', 'enabled', true);
+
+    const connected = new Set<HTMLElement>();
+    const setGaze = (on: boolean) => {
+      gaze.setAttribute('visible', on);
+      gaze.setAttribute('raycaster', 'enabled', on);
     };
-    const exit = () => {
-      gaze.setAttribute('visible', false);
-      gaze.setAttribute('raycaster', 'enabled', false);
+    const syncGaze = () => setGaze(sceneEl.is('vr-mode') && connected.size === 0);
+
+    const onConnected = (e: Event) => {
+      const hand = e.currentTarget as HTMLElement;
+      connected.add(hand);
+      (hand as unknown as AEl).setAttribute('raycaster', 'enabled', true);
+      syncGaze();
     };
-    sceneEl.addEventListener('enter-vr', enter);
-    sceneEl.addEventListener('exit-vr', exit);
+    const onDisconnected = (e: Event) => {
+      const hand = e.currentTarget as HTMLElement;
+      connected.delete(hand);
+      (hand as unknown as AEl).setAttribute('raycaster', 'enabled', false);
+      syncGaze();
+    };
+
+    sceneEl.addEventListener('enter-vr', syncGaze);
+    sceneEl.addEventListener('exit-vr', syncGaze);
+    hands.forEach((h) => {
+      h.addEventListener('controllerconnected', onConnected);
+      h.addEventListener('controllerdisconnected', onDisconnected);
+    });
     return () => {
-      sceneEl.removeEventListener('enter-vr', enter);
-      sceneEl.removeEventListener('exit-vr', exit);
+      sceneEl.removeEventListener('enter-vr', syncGaze);
+      sceneEl.removeEventListener('exit-vr', syncGaze);
+      hands.forEach((h) => {
+        h.removeEventListener('controllerconnected', onConnected);
+        h.removeEventListener('controllerdisconnected', onDisconnected);
+      });
     };
   }, [ready]);
 
@@ -294,6 +324,20 @@ export default function VRScene({ initialSceneId }: { initialSceneId: string }) 
             material="color: #ffffff; shader: flat; opacity: 0.9"
           />
         </a-camera>
+
+        {/* Controller VR (Meta Quest Touch, dll) — sinar laser + trigger = klik.
+            Model & sinar baru muncul saat controller terhubung (di sesi VR);
+            raycaster dinyalakan oleh handler controllerconnected di atas. */}
+        <a-entity
+          ref={leftHandRef}
+          laser-controls="hand: left"
+          raycaster="objects: .hs-hit; far: 20; enabled: false"
+        />
+        <a-entity
+          ref={rightHandRef}
+          laser-controls="hand: right"
+          raycaster="objects: .hs-hit; far: 20; enabled: false"
+        />
 
         {hotspotsVisible && activeScene && (
           <HotspotLayer
